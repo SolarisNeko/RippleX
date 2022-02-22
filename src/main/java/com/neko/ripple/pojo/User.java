@@ -19,5 +19,6 @@ public class User {
     String name;
     Integer age;
     String job;
+    Double salary;
 
 }

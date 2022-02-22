@@ -1,7 +1,7 @@
-package com.neko.ripple.calculate;
+package com.neko.ripple;
 
-import com.neko.ripple.ReflectUtil;
 import com.neko.ripple.constant.AggregateOption;
+import com.neko.ripple.reflect.ReflectUtil;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -27,6 +27,7 @@ public class RippleX {
     private ArrayList<String> aggColumnNameList;
     private ArrayList<String> keepColList;
     int count = 0;
+    boolean isMapCacheExist = false;
 
     String currentCacheKey = null;
     Map<String, Map> groupByMapCache = new HashMap<>();
@@ -93,9 +94,9 @@ public class RippleX {
             for (String aggCol : aggColumnNameList) {
                 Object value = ReflectUtil.getValueByField(data, aggCol);
 
-                Integer aggValue = Integer.valueOf(String.valueOf(
-                    Optional.ofNullable(value).orElse("1")
-                ));
+                Double aggValue = Double.valueOf(
+                    String.valueOf(Optional.ofNullable(value).orElse("1"))
+                );
 
                 // Aggregate 应该动态选择使用
                 handleAggregateByType(aggOperateMap, aggMap, aggCol, aggValue);
@@ -119,28 +120,35 @@ public class RippleX {
                 aggMap.put(keepCol, keepColValue);
             }
 
-            aggMapList.add(aggMap);
+            if (isMapCacheExist) {
+                isMapCacheExist = resetCache();
+            } else {
+                aggMapList.add(aggMap);
+            }
         }
 
-        return aggMapList.stream().distinct().collect(Collectors.toList());
+        return aggMapList;
+    }
+
+    private boolean resetCache() {
+        return false;
     }
 
     /**
      * group By [N column] : 1 Map
+     * "column_value_1,column_value_2" : aggregate Map
      *
      * @param data 处理的数据
      * @return group By Map
      */
     private Map<String, Object> getGroupByMap(Object data) {
-
-        // 通过 group By column... 确认一个 Map
         Map<String, Object> aggMap = getExistsGroupByMap(data, groupColumnList);
         if (aggMap != null) {
+            isMapCacheExist = true;
             return aggMap;
         }
 
         aggMap = new HashMap<>();
-
         // 不存在， 构建一个 Group By Map
         for (String groupColumn : groupColumnList) {
             Object value = ReflectUtil.getValueByField(data, groupColumn);
@@ -172,23 +180,26 @@ public class RippleX {
     }
 
 
-    private static void handleAggregateByType(Map<String, AggregateOption> aggOperateMap, Map<String, Object> outputMap, String aggCol, Integer aggValue) {
+    private static void handleAggregateByType(Map<String, AggregateOption> aggOperateMap, Map<String, Object> outputMap, String aggCol, Double aggValue) {
         AggregateOption aggType = aggOperateMap.get(aggCol);
+        if (aggType == null) {
+            return;
+        }
         switch (aggType) {
             case SUM: {
-                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Integer) t1 + (Integer) t2);
+                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Double) t1 + (Double) t2);
                 break;
             }
             case COUNT: {
-                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Integer) t1 + 1);
+                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Double) t1 + 1);
                 break;
             }
             case MAX: {
-                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Integer) t1 > (Integer) t2 ? t1 : t2);
+                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Double) t1 > (Double) t2 ? t1 : t2);
                 break;
             }
             case MIN: {
-                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Integer) t1 < (Integer) t2 ? t1 : t2);
+                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Double) t1 < (Double) t2 ? t1 : t2);
                 break;
             }
             default: {

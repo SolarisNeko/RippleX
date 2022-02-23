@@ -1,6 +1,11 @@
 package com.neko.ripple.reflect;
 
+import org.apache.commons.beanutils.BeanUtils;
+
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * @author SolarisNeko
@@ -49,5 +54,16 @@ public class ReflectUtil {
             superclass = superclass.getSuperclass();
         }
         return null;
+    }
+
+    public static List<Field> getFieldsRecursive(Class<?> schema) {
+        List<Field> fields = new ArrayList<>();
+        Class<?> temp = schema;
+        while (!"Object".equals(temp.getSimpleName())) {
+            Field[] declaredFields = temp.getDeclaredFields();
+            fields.addAll(Arrays.asList(declaredFields));
+            temp = temp.getSuperclass();
+        }
+        return fields;
     }
 }

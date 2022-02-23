@@ -5,7 +5,6 @@ import com.neko.ripple.reflect.ReflectUtil;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,27 +17,74 @@ import java.util.stream.Collectors;
  **/
 public class RippleX {
 
-    private List dataList;
+    int count = 0;
+    boolean isMapCacheExist = false;
+    String currentCacheKey = null;
+    Map<String, Map<String, Object>> groupByMapCache = new HashMap<>();
+    List<Map<String, Object>> aggMapList = new ArrayList<>();
+    private Class<?> schema;
+    private List<?> dataList;
     private Map<String, AggregateOption> aggOperateMap;
     private List<String> groupColumnList;
-    private List<String> exceptColumnList;
-
+    private List<String> excludeColumnList;
     private List<String> allColNameList;
     private ArrayList<String> aggColumnNameList;
     private ArrayList<String> keepColList;
-    int count = 0;
-    boolean isMapCacheExist = false;
-
-    String currentCacheKey = null;
-    Map<String, Map> groupByMapCache = new HashMap<>();
-
-    List<Map<String, Object>> aggMapList = new ArrayList<>();
 
     private RippleX() {
     }
 
     public static RippleX builder() {
         return new RippleX();
+    }
+
+    private static void handleAggregateByType(Map<String, AggregateOption> aggOperateMap, Map<String, Object> outputMap, String aggCol, String aggValue) {
+        AggregateOption aggType = aggOperateMap.get(aggCol);
+        if (aggType == null) {
+            return;
+        }
+        switch (aggType) {
+            case SUM: {
+                Double sumValue = Double.valueOf(aggValue);
+                outputMap.merge(aggCol, sumValue, (t1, t2) -> (Double) t1 + (Double) t2);
+                break;
+            }
+            case COUNT: {
+                outputMap.merge(aggCol, 1, (t1, t2) -> (Integer) t1 + 1);
+                break;
+            }
+            case MAX: {
+                // TODO 待修复
+                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Double) t1 > (Double) t2 ? t1 : t2);
+                break;
+            }
+            case MIN: {
+                // TODO 待修复
+                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Double) t1 < (Double) t2 ? t1 : t2);
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
+    private static void checkTypeByAggregateOption(Map<String, AggregateOption> aggOperateMap, Field aggField) {
+        String name = aggField.getName();
+        AggregateOption aggregateOption = aggOperateMap.get(name);
+
+        switch (aggregateOption) {
+            case SUM: {
+                Class<?> type = aggField.getType();
+                if (type != Integer.class) {
+                    throw new RuntimeException("column " + aggField.getName() + " can't be statistic. ");
+                }
+                break;
+            }
+            default: {
+                break;
+            }
+        }
     }
 
     public <T> RippleX data(List<T> dataList) {
@@ -59,30 +105,35 @@ public class RippleX {
         return this;
     }
 
+    public RippleX exclude(List<String> excludeColumnList) {
+        this.excludeColumnList = excludeColumnList;
+        return this;
+    }
 
-    public RippleX except(List<String> exceptColumnList) {
-        this.exceptColumnList = exceptColumnList;
+    public RippleX schema(Class<?> schema) {
+        this.schema = schema;
         return this;
     }
 
     public List<Map<String, Object>> build() {
 
-        Object o = dataList.get(0);
-        Field[] allColumns = o.getClass().getDeclaredFields();
+        checkSchema();
+        // TODO get all schema's fields
+        List<Field> allColumns = ReflectUtil.getFieldsRecursive(schema);
 
         // 1 all field
-        allColNameList = Arrays.stream(allColumns).map(Field::getName).collect(Collectors.toList());
+        allColNameList = allColumns.stream().map(Field::getName).collect(Collectors.toList());
         count = allColNameList.size();
 
         // 2 aggregate fields
         aggColumnNameList = new ArrayList<>(allColNameList);
         aggColumnNameList.removeAll(groupColumnList);
-        aggColumnNameList.removeAll(exceptColumnList);
+        aggColumnNameList.removeAll(excludeColumnList);
 
         // 3
         keepColList = new ArrayList<>(allColNameList);
         keepColList.removeAll(aggColumnNameList);
-        keepColList.removeAll(exceptColumnList);
+        keepColList.removeAll(excludeColumnList);
 
         // 2、Aggregate
         // aggregate Field 必须是 Number 类型
@@ -94,9 +145,8 @@ public class RippleX {
             for (String aggCol : aggColumnNameList) {
                 Object value = ReflectUtil.getValueByField(data, aggCol);
 
-                Double aggValue = Double.valueOf(
-                    String.valueOf(Optional.ofNullable(value).orElse("1"))
-                );
+
+                String aggValue = String.valueOf(Optional.ofNullable(value).orElse("1"));
 
                 // Aggregate 应该动态选择使用
                 handleAggregateByType(aggOperateMap, aggMap, aggCol, aggValue);
@@ -128,6 +178,12 @@ public class RippleX {
         }
 
         return aggMapList;
+    }
+
+    private void checkSchema() {
+        if ("Object".equals(schema.getSimpleName())) {
+            throw new RuntimeException("Object can't be a schema because it have no fields.");
+        }
     }
 
     private boolean resetCache() {
@@ -163,7 +219,7 @@ public class RippleX {
         return aggMap;
     }
 
-    private Map getExistsGroupByMap(Object data, List<String> groupColumnList) {
+    private Map<String, Object> getExistsGroupByMap(Object data, List<String> groupColumnList) {
         List<String> valueStrings = getColumnValueStrList(data, groupColumnList);
         String join = String.join(",", valueStrings);
         currentCacheKey = join;
@@ -177,55 +233,6 @@ public class RippleX {
             valueStrings.add(String.valueOf(valueByField));
         }
         return valueStrings;
-    }
-
-
-    private static void handleAggregateByType(Map<String, AggregateOption> aggOperateMap, Map<String, Object> outputMap, String aggCol, Double aggValue) {
-        AggregateOption aggType = aggOperateMap.get(aggCol);
-        if (aggType == null) {
-            return;
-        }
-        switch (aggType) {
-            case SUM: {
-                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Double) t1 + (Double) t2);
-                break;
-            }
-            case COUNT: {
-                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Double) t1 + 1);
-                break;
-            }
-            case MAX: {
-                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Double) t1 > (Double) t2 ? t1 : t2);
-                break;
-            }
-            case MIN: {
-                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Double) t1 < (Double) t2 ? t1 : t2);
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-    }
-
-    private static void checkTypeByAggregateOption(Map<String, AggregateOption> aggOperateMap, Field aggField) {
-        String name = aggField.getName();
-        AggregateOption aggregateOption = aggOperateMap.get(name);
-
-        switch (aggregateOption) {
-            case SUM: {
-                Class<?> type = aggField.getType();
-                if (type != Integer.class) {
-                    throw new RuntimeException("column " + aggField.getName() + " can't be statistic. ");
-                }
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-
-
     }
 
 

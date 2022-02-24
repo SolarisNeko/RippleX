@@ -12,16 +12,18 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
+ * Dimension/Measure Theory + ETL Thought
+ *
  * @author SolarisNeko
  * @date 2022-02-22
  **/
 public class RippleX {
 
-    int count = 0;
-    boolean isMapCacheExist = false;
-    String currentCacheKey = null;
-    Map<String, Map<String, Object>> groupByMapCache = new HashMap<>();
-    List<Map<String, Object>> aggMapList = new ArrayList<>();
+    private int count = 0;
+    private boolean isMapCacheExist = false;
+    private String currentCacheKey = null;
+    private Map<String, Map<String, Object>> groupByMapCache = new HashMap<>();
+    private List<Map<String, Object>> aggMapList = new ArrayList<>();
     private Class<?> schema;
     private List<?> dataList;
     private Map<String, AggregateOption> aggOperateMap;
@@ -55,12 +57,20 @@ public class RippleX {
             }
             case MAX: {
                 // TODO 待修复
-                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Double) t1 > (Double) t2 ? t1 : t2);
+                outputMap.merge(aggCol, aggValue, (t1, t2) -> {
+                    Double left = Double.valueOf(t1.toString());
+                    Double right = Double.valueOf(t1.toString());
+                    return right > left ? left : right;
+                });
                 break;
             }
             case MIN: {
                 // TODO 待修复
-                outputMap.merge(aggCol, aggValue, (t1, t2) -> (Double) t1 < (Double) t2 ? t1 : t2);
+                outputMap.merge(aggCol, aggValue, (t1, t2) -> {
+                    Double left = Double.valueOf(t1.toString());
+                    Double right = Double.valueOf(t1.toString());
+                    return left > right ? left : right;
+                });
                 break;
             }
             default: {

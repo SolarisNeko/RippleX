@@ -1,5 +1,7 @@
 package pojo;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -11,21 +13,17 @@ import lombok.NoArgsConstructor;
  */
 @Data
 @NoArgsConstructor
-public class Cat extends Animal {
+@AllArgsConstructor
+@Builder
+public class Cat {
 
-    public Cat(Integer id, String name, String type, Integer price) {
-        super(id, name);
-        this.type = type;
-        this.price = price;
-    }
+    Integer id;
 
-    public Cat(Integer id, String name, String type) {
-        super(id, name);
-        this.type = type;
-    }
+    String name;
 
     String type;
 
     Integer price;
+
 
 }

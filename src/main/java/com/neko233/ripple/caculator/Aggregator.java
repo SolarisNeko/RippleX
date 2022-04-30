@@ -15,12 +15,12 @@ public class Aggregator {
 
     /**
      * 单步聚合
-     * @param aggregateDataMap 聚合后的数据 Map
+     * @param aggregateMap 聚合后的数据 Map< fieldName, value >
      * @param aggTypeMap 聚合类型映射
      * @param aggColName 列名
      * @param aggValue 值
      */
-    public static void aggregateByStep(Map<String, Object> aggregateDataMap, Map<String, AggregateType> aggTypeMap, String aggColName, Object aggValue) {
+    public static void aggregateByStep(Map<String, Object> aggregateMap, Map<String, AggregateType> aggTypeMap, String aggColName, Object aggValue) {
         // 1. get user AggregateType
         AggregateType aggType = aggTypeMap.get(aggColName);
         if (aggType == null) {
@@ -32,11 +32,11 @@ public class Aggregator {
         BiFunction<? super Object, ? super Object, ?> merge = mergeStrategy.merge(aggValue.getClass());
         // 3. COUNT is a special type
         if (aggType == AggregateType.COUNT) {
-            aggregateDataMap.merge(aggColName, 1, merge);
+            aggregateMap.merge(aggColName, 1, merge);
         } else if (aggType == AggregateType.COUNT_DISTINCT) {
-            aggregateDataMap.merge(aggColName, 1, merge);
+            aggregateMap.merge(aggColName, 1, merge);
         } else {
-            aggregateDataMap.merge(aggColName, aggValue, merge);
+            aggregateMap.merge(aggColName, aggValue, merge);
         }
     }
 

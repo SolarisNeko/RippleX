@@ -16,45 +16,43 @@ public class Demo_Backup {
 
     @Test
     public void test() {
-        // group by 字段做 distinct 处理, 其余做 aggregate 操作
-        List<String> groupColumnList = new ArrayList<String>() {{
-//            add("job");
-            add("type");
-        }};
 
-        List<String> excludeColumnList = new ArrayList<String>() {{
-//            add("name");
-//            add("id");
-        }};
-
-        Map<String, AggregateType> handleMap = new HashMap<String, AggregateType>() {{
-//            put("id", AggregateOption.MAX);
-//            put("age", AggregateOption.SUM);
-//            put("salary", AggregateOption.MIN);
-            put("name", AggregateType.COUNT);
-        }};
-
-        List<User> users = new ArrayList<User>() {{
-            add(User.builder().id(1).name("neko").job("worker").age(18).salary(1000d).build());
-            add(User.builder().id(2).name("doge").job("worker").age(30).salary(2000d).build());
-            add(User.builder().id(3).name("duck").job("worker").age(40).salary(1000d).build());
-        }};
         List<Cat> cats = new ArrayList<Cat>() {{
-            add(new Cat(1, "Zzz", "布偶"));
-            add(new Cat(2, "小花", "布偶"));
-            add(new Cat(3, "哈撒给", "英美"));
+            add(Cat.builder()
+                    .id(1)
+                    .name("Zzz")
+                    .type("布偶")
+                    .build());
+            add(Cat.builder()
+                    .id(1)
+                    .name("小花")
+                    .type("布偶")
+                    .build());
+            add(Cat.builder()
+                    .id(1)
+                    .name("halo")
+                    .type("英美")
+                    .build());
+            add(Cat.builder()
+                    .id(1)
+                    .name("Zzz")
+                    .type("布偶")
+                    .build());
         }};
 
-        List<Map<String, Object>> ripple = RippleX.builder()
-                .data(users)
-                .returnType(User.class)
-                .aggregateRelationMap(handleMap)
-                .groupColumnNames(groupColumnList)
-                .excludeColumnNames(excludeColumnList)
+        List<Cat> ripple = RippleX.builder()
+                .data(cats)
+                .groupColumnNames("type")
+                .excludeColumnNames("id")
+                .aggregateRelationMap(new HashMap<String, AggregateType>() {{
+                    put("name", AggregateType.COUNT);
+                }})
+                .returnType(Cat.class)
                 .build();
 
 
-        System.out.println(ripple);
+        ripple.forEach(System.out::println);
+
     }
 
 }

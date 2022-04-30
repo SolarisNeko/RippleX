@@ -4,6 +4,7 @@ import com.neko233.ripple.caculator.Aggregator;
 import com.neko233.ripple.constant.AggregateType;
 import com.neko233.ripple.orm.Map2InstanceOrm;
 import com.neko233.ripple.util.ReflectUtil;
+import org.apache.commons.collections.MapUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.lang.reflect.Field;
@@ -18,15 +19,11 @@ import java.util.stream.Collectors;
  **/
 public class RippleX {
 
-    public static final String DELIMITER = ",";
-    private int fieldNameSize = 0;
-    private boolean isMapCacheExist = false;
-    private String currentGroupByKey = null;
+    private static final String DELIMITER = ",";
+
     /**
-     * groupByKey : toNextAggregateDataMap< FieldName, value >
+     * 1. MetaData
      */
-    private Map<String, Map<String, Object>> groupByMapCache = new HashMap<>();
-    private List<Map<String, Object>> resultMapList = new ArrayList<>();
     private Class<?> schema;
     private List<?> dataList;
     private Map<String, AggregateType> aggregateRelationMap;
@@ -36,30 +33,28 @@ public class RippleX {
     private ArrayList<String> aggColumnNameList;
     private ArrayList<String> keepColumnNames;
 
+    /**
+     * 2. Calculate Needed Data
+     */
+    private int fieldNameSize = 0;
+    private boolean IS_EXISTED_CACHE_FLAG = false;
+    private String CURRENT_GROUP_BY_KEY = null;
+    /**
+     * groupByKey : toNextAggregateDataMap< FieldName, value >
+     */
+    private Map<String, Map<String, Object>> aggMapCache = new HashMap<>();
+
+    /**
+     * 3. Response
+     */
+    private List<Map<String, Object>> resultMapList = new ArrayList<>();
+
+
     private RippleX() {
     }
 
     public static RippleX builder() {
         return new RippleX();
-    }
-
-
-    private static void checkTypeByAggregateOption(Map<String, AggregateType> aggOperateMap, Field aggField) {
-        String name = aggField.getName();
-        AggregateType aggregateType = aggOperateMap.get(name);
-
-        switch (aggregateType) {
-            case SUM: {
-                Class<?> type = aggField.getType();
-                if (type != Integer.class) {
-                    throw new RuntimeException("column " + aggField.getName() + " can't be statistic. ");
-                }
-                break;
-            }
-            default: {
-                break;
-            }
-        }
     }
 
     public <T> RippleX data(List<T> dataList) {
@@ -89,6 +84,7 @@ public class RippleX {
         this.excludeColumnList = Arrays.asList(excludeColumnNames);
         return this;
     }
+
     public RippleX excludeColumnNames(List<String> excludeColumnNames) {
         this.excludeColumnList = excludeColumnNames;
         return this;
@@ -101,14 +97,15 @@ public class RippleX {
 
     /**
      * build
+     *
      * @return 构建出分组计算后的 List<Map>
      */
     public <T> List<T> build() {
 
         checkSchema();
+        // get Map
         List<Map<String, Object>> aggregateDataMapList = getAggregateDataMapList();
-
-        // TODO - ORM
+        // orm
         return (List<T>) Map2InstanceOrm.orm(aggregateDataMapList, schema);
 
     }
@@ -125,42 +122,39 @@ public class RippleX {
 
         // 3. aggregate calculate
         for (Object data : dataList) {
-            Map<String, Object> dataMap = getGroupByMap(data);
+            // 获取 new Map / cached Map, 基于
+            Map<String, Object> aggMap = getGroupByMapOrCache(data);
 
-            // 对 Group By Map 进行 agg / create once 操作
             for (String aggColName : aggColumnNameList) {
                 Object value = ReflectUtil.getValueByField(data, aggColName);
-
-                // Aggregate 应该动态选择使用
-                Aggregator.aggregateByStep(dataMap, aggregateRelationMap, aggColName, value);
+                // 计算聚合
+                Aggregator.aggregateByStep(aggMap, aggregateRelationMap, aggColName, value);
             }
 
             // Keep not change column
-            for (String keepColName : keepColumnNames) {
-                if (dataMap.get(keepColName) != null) {
-                    continue;
-                }
-                Object value = ReflectUtil.getValueByField(data, keepColName);
-                if (value == null) {
-                    continue;
-                }
-                String keepColValue = String.valueOf(
-                    Optional.ofNullable(value).orElse("")
-                );
+            setNotChangeColumnValue2AggMap(data, aggMap);
 
-                if (keepColValue == null) {
-                    continue;
-                }
-                dataMap.put(keepColName, keepColValue);
-            }
-
-            if (isMapCacheExist) {
-                isMapCacheExist = resetCache();
+            // 判断是否存在过
+            if (IS_EXISTED_CACHE_FLAG) {
+                IS_EXISTED_CACHE_FLAG = false;
             } else {
-                resultMapList.add(dataMap);
+                resultMapList.add(aggMap);
             }
         }
         return resultMapList;
+    }
+
+    private void setNotChangeColumnValue2AggMap(Object data, Map<String, Object> dataMap) {
+        for (String keepColName : keepColumnNames) {
+            if (dataMap.get(keepColName) != null) {
+                continue;
+            }
+            Object value = ReflectUtil.getValueByField(data, keepColName);
+            if (value == null) {
+                continue;
+            }
+            dataMap.put(keepColName, value);
+        }
     }
 
     private void rememberAndSetConfigOptions(List<Field> allColumns) {
@@ -185,48 +179,44 @@ public class RippleX {
         }
     }
 
-    private boolean resetCache() {
-        return false;
-    }
-
     /**
      * group By [N column] : 1 Map
      * "column_value_1,column_value_2" : aggregate Map
      *
-     * @param data 处理的数据
+     * @param obj 处理的数据
      * @return group By Map
      */
-    private Map<String, Object> getGroupByMap(Object data) {
-        Map<String, Object> aggMap = tryGetExistsGroupByMap(data);
-        if (aggMap != null) {
-            isMapCacheExist = true;
-            return aggMap;
+    private Map<String, Object> getGroupByMapOrCache(Object obj) {
+        Map<String, Object> cacheMap = getMapFromCacheByObjectValues(obj);
+        if (MapUtils.isNotEmpty(cacheMap)) {
+            IS_EXISTED_CACHE_FLAG = true;
+            return cacheMap;
         }
 
-        aggMap = new HashMap<>();
-        // 不存在， 构建一个 Group By Map
+        // 不存在， 构建一个 Aggregate Map
+        Map<String, Object> dataMap = new HashMap<>();
         for (String groupColumn : groupColumnNames) {
-            Object value = ReflectUtil.getValueByField(data, groupColumn);
+            Object value = ReflectUtil.getValueByField(obj, groupColumn);
             if (value == null) {
                 continue;
             }
-
-            aggMap.put(groupColumn, value);
+            dataMap.put(groupColumn, value);
         }
-
-        groupByMapCache.put(currentGroupByKey, aggMap);
-        return aggMap;
+        // 放入缓存
+        aggMapCache.put(CURRENT_GROUP_BY_KEY, dataMap);
+        return dataMap;
     }
 
     /**
      * 尝试获取已经存在的 GroupByMap
+     *
      * @param data data
      * @return
      */
-    private Map<String, Object> tryGetExistsGroupByMap(Object data) {
+    private Map<String, Object> getMapFromCacheByObjectValues(Object data) {
         List<String> valueStrings = getColumnValueStrList(data, groupColumnNames);
-        currentGroupByKey = String.join(DELIMITER, valueStrings);
-        return groupByMapCache.get(currentGroupByKey);
+        CURRENT_GROUP_BY_KEY = String.join(DELIMITER, valueStrings);
+        return aggMapCache.get(CURRENT_GROUP_BY_KEY);
     }
 
     private List<String> getColumnValueStrList(Object data, List<String> columnList) {

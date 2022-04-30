@@ -2,6 +2,7 @@ package demo;
 
 import com.neko233.ripple.RippleX;
 import com.neko233.ripple.constant.AggregateType;
+import org.junit.jupiter.api.Test;
 import pojo.Cat;
 import pojo.User;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -13,7 +14,8 @@ import java.util.Map;
 
 public class Demo_Backup {
 
-    public static void main(String[] args) {
+    @Test
+    public void test() {
         // group by 字段做 distinct 处理, 其余做 aggregate 操作
         List<String> groupColumnList = new ArrayList<String>() {{
 //            add("job");
@@ -44,12 +46,12 @@ public class Demo_Backup {
         }};
 
         List<Map<String, Object>> ripple = RippleX.builder()
-            .data(users)
-            .returnType(User.class)
-            .aggregateRelationMap(handleMap)
-            .groupColumnNames(groupColumnList)
-            .excludeColumnNames(excludeColumnList)
-            .build();
+                .data(users)
+                .returnType(User.class)
+                .aggregateRelationMap(handleMap)
+                .groupColumnNames(groupColumnList)
+                .excludeColumnNames(excludeColumnList)
+                .build();
 
 
         System.out.println(ripple);

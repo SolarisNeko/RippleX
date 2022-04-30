@@ -1,5 +1,6 @@
 package demo;
 
+import org.junit.jupiter.api.Test;
 import pojo.Cat;
 import pojo.User;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -10,7 +11,8 @@ import java.util.stream.Collectors;
 
 public class Demo2 {
 
-    public static void main(String[] args) {
+    @Test
+    public void test() {
 
         List<User> users = new ArrayList<User>() {{
             add(User.builder().id(1).name("neko").job("worker").age(18).salary(1000d).build());

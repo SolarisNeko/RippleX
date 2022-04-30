@@ -10,6 +10,8 @@ public enum AggregateType {
 
     COUNT,
 
+    COUNT_DISTINCT,
+
     MAX,
 
     MIN,

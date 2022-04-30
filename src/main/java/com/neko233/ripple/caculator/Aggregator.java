@@ -1,4 +1,4 @@
-package com.neko233.ripple.strategy;
+package com.neko233.ripple.caculator;
 
 import com.neko233.ripple.constant.AggregateType;
 import com.neko233.ripple.strategy.merge.MergeStrategy;
@@ -10,9 +10,17 @@ import java.util.function.BiFunction;
  * @author SolarisNeko
  * Date on 2022-04-30
  */
-public class AggregateStrategy {
+public class Aggregator {
 
-    public static void aggregate(Map<String, Object> aggregateDataMap, Map<String, AggregateType> aggTypeMap, String aggColName, Object aggValue) {
+
+    /**
+     * 单步聚合
+     * @param aggregateDataMap 聚合后的数据 Map
+     * @param aggTypeMap 聚合类型映射
+     * @param aggColName 列名
+     * @param aggValue 值
+     */
+    public static void aggregateByStep(Map<String, Object> aggregateDataMap, Map<String, AggregateType> aggTypeMap, String aggColName, Object aggValue) {
         // 1. get user AggregateType
         AggregateType aggType = aggTypeMap.get(aggColName);
         if (aggType == null) {
@@ -24,6 +32,8 @@ public class AggregateStrategy {
         BiFunction<? super Object, ? super Object, ?> merge = mergeStrategy.merge(aggValue.getClass());
         // 3. COUNT is a special type
         if (aggType == AggregateType.COUNT) {
+            aggregateDataMap.merge(aggColName, 1, merge);
+        } else if (aggType == AggregateType.COUNT_DISTINCT) {
             aggregateDataMap.merge(aggColName, 1, merge);
         } else {
             aggregateDataMap.merge(aggColName, aggValue, merge);

@@ -1,8 +1,8 @@
 package com.neko233.ripple;
 
+import com.neko233.ripple.caculator.Aggregator;
 import com.neko233.ripple.constant.AggregateType;
 import com.neko233.ripple.orm.Map2InstanceOrm;
-import com.neko233.ripple.strategy.AggregateStrategy;
 import com.neko233.ripple.util.ReflectUtil;
 import org.springframework.util.CollectionUtils;
 
@@ -18,9 +18,13 @@ import java.util.stream.Collectors;
  **/
 public class RippleX {
 
+    public static final String DELIMITER = ",";
     private int fieldNameSize = 0;
     private boolean isMapCacheExist = false;
-    private String currentCacheKey = null;
+    private String currentGroupByKey = null;
+    /**
+     * groupByKey : toNextAggregateDataMap< FieldName, value >
+     */
     private Map<String, Map<String, Object>> groupByMapCache = new HashMap<>();
     private List<Map<String, Object>> resultMapList = new ArrayList<>();
     private Class<?> schema;
@@ -110,30 +114,16 @@ public class RippleX {
     }
 
     private List<Map<String, Object>> getAggregateDataMapList() {
-        // schema 必须拥有和 dataList 一样的 fieldName, 否则统计统计失败
+        // 1. check
         List<Field> allColumns = ReflectUtil.getFieldsRecursive(schema);
-
         if (CollectionUtils.isEmpty(allColumns)) {
             return new ArrayList<>();
         }
 
-        // 1 all field
-        aClassAllColumnName = allColumns.stream().map(Field::getName).collect(Collectors.toList());
-        fieldNameSize = aClassAllColumnName.size();
+        // 2. set config options
+        rememberAndSetConfigOptions(allColumns);
 
-        // 2 aggregate fields
-        aggColumnNameList = new ArrayList<>(aClassAllColumnName);
-        aggColumnNameList.removeAll(groupColumnNames);
-        aggColumnNameList.removeAll(excludeColumnList);
-
-        // 3
-        keepColumnNames = new ArrayList<>(aClassAllColumnName);
-        keepColumnNames.removeAll(aggColumnNameList);
-        keepColumnNames.removeAll(excludeColumnList);
-
-        // 2、Aggregate
-        // aggregate Field 必须是 Number 类型
-
+        // 3. aggregate calculate
         for (Object data : dataList) {
             Map<String, Object> dataMap = getGroupByMap(data);
 
@@ -142,7 +132,7 @@ public class RippleX {
                 Object value = ReflectUtil.getValueByField(data, aggColName);
 
                 // Aggregate 应该动态选择使用
-                AggregateStrategy.aggregate(dataMap, aggregateRelationMap, aggColName, value);
+                Aggregator.aggregateByStep(dataMap, aggregateRelationMap, aggColName, value);
             }
 
             // Keep not change column
@@ -173,6 +163,22 @@ public class RippleX {
         return resultMapList;
     }
 
+    private void rememberAndSetConfigOptions(List<Field> allColumns) {
+        // 1 all field
+        aClassAllColumnName = allColumns.stream().map(Field::getName).collect(Collectors.toList());
+        fieldNameSize = aClassAllColumnName.size();
+
+        // 2 aggregate fields
+        aggColumnNameList = new ArrayList<>(aClassAllColumnName);
+        aggColumnNameList.removeAll(groupColumnNames);
+        aggColumnNameList.removeAll(excludeColumnList);
+
+        // 3
+        keepColumnNames = new ArrayList<>(aClassAllColumnName);
+        keepColumnNames.removeAll(aggColumnNameList);
+        keepColumnNames.removeAll(excludeColumnList);
+    }
+
     private void checkSchema() {
         if ("Object".equals(schema.getSimpleName())) {
             throw new RuntimeException("Object can't be a schema because it have no fields.");
@@ -191,7 +197,7 @@ public class RippleX {
      * @return group By Map
      */
     private Map<String, Object> getGroupByMap(Object data) {
-        Map<String, Object> aggMap = getExistsGroupByMap(data, groupColumnNames);
+        Map<String, Object> aggMap = tryGetExistsGroupByMap(data);
         if (aggMap != null) {
             isMapCacheExist = true;
             return aggMap;
@@ -208,15 +214,19 @@ public class RippleX {
             aggMap.put(groupColumn, value);
         }
 
-        groupByMapCache.put(currentCacheKey, aggMap);
+        groupByMapCache.put(currentGroupByKey, aggMap);
         return aggMap;
     }
 
-    private Map<String, Object> getExistsGroupByMap(Object data, List<String> groupColumnList) {
-        List<String> valueStrings = getColumnValueStrList(data, groupColumnList);
-        String join = String.join(",", valueStrings);
-        currentCacheKey = join;
-        return groupByMapCache.get(join);
+    /**
+     * 尝试获取已经存在的 GroupByMap
+     * @param data data
+     * @return
+     */
+    private Map<String, Object> tryGetExistsGroupByMap(Object data) {
+        List<String> valueStrings = getColumnValueStrList(data, groupColumnNames);
+        currentGroupByKey = String.join(DELIMITER, valueStrings);
+        return groupByMapCache.get(currentGroupByKey);
     }
 
     private List<String> getColumnValueStrList(Object data, List<String> columnList) {

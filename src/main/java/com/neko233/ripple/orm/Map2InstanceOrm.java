@@ -10,8 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static java.util.stream.Collectors.toMap;
-
 /**
  * @author SolarisNeko
  * Date on 2022-04-30
@@ -53,7 +51,6 @@ public class Map2InstanceOrm {
             }
 
         }
-
         return (T) newInstance;
     }
 

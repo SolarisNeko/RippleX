@@ -1,6 +1,4 @@
-package com.neko.ripple.reflect;
-
-import org.apache.commons.beanutils.BeanUtils;
+package com.neko233.ripple.util;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;

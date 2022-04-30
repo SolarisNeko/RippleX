@@ -1,4 +1,4 @@
-package com.neko.ripple.pojo;
+package pojo;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

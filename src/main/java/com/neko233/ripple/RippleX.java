@@ -1,14 +1,13 @@
-package com.neko.ripple;
+package com.neko233.ripple;
 
-import com.neko.ripple.constant.AggregateOption;
-import com.neko.ripple.reflect.ReflectUtil;
+import com.neko233.ripple.constant.AggregateType;
+import com.neko233.ripple.orm.Map2InstanceOrm;
+import com.neko233.ripple.strategy.AggregateStrategy;
+import com.neko233.ripple.util.ReflectUtil;
+import org.springframework.util.CollectionUtils;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -19,19 +18,19 @@ import java.util.stream.Collectors;
  **/
 public class RippleX {
 
-    private int count = 0;
+    private int fieldNameSize = 0;
     private boolean isMapCacheExist = false;
     private String currentCacheKey = null;
     private Map<String, Map<String, Object>> groupByMapCache = new HashMap<>();
-    private List<Map<String, Object>> aggMapList = new ArrayList<>();
+    private List<Map<String, Object>> resultMapList = new ArrayList<>();
     private Class<?> schema;
     private List<?> dataList;
-    private Map<String, AggregateOption> aggOperateMap;
-    private List<String> groupColumnList;
+    private Map<String, AggregateType> aggregateRelationMap;
+    private List<String> groupColumnNames;
     private List<String> excludeColumnList;
-    private List<String> allColNameList;
+    private List<String> aClassAllColumnName;
     private ArrayList<String> aggColumnNameList;
-    private ArrayList<String> keepColList;
+    private ArrayList<String> keepColumnNames;
 
     private RippleX() {
     }
@@ -40,50 +39,12 @@ public class RippleX {
         return new RippleX();
     }
 
-    private static void handleAggregateByType(Map<String, AggregateOption> aggOperateMap, Map<String, Object> outputMap, String aggCol, String aggValue) {
-        AggregateOption aggType = aggOperateMap.get(aggCol);
-        if (aggType == null) {
-            return;
-        }
-        switch (aggType) {
-            case SUM: {
-                Double sumValue = Double.valueOf(aggValue);
-                outputMap.merge(aggCol, sumValue, (t1, t2) -> (Double) t1 + (Double) t2);
-                break;
-            }
-            case COUNT: {
-                outputMap.merge(aggCol, 1, (t1, t2) -> (Integer) t1 + 1);
-                break;
-            }
-            case MAX: {
-                // TODO 待修复
-                outputMap.merge(aggCol, aggValue, (t1, t2) -> {
-                    Double left = Double.valueOf(t1.toString());
-                    Double right = Double.valueOf(t1.toString());
-                    return right > left ? left : right;
-                });
-                break;
-            }
-            case MIN: {
-                // TODO 待修复
-                outputMap.merge(aggCol, aggValue, (t1, t2) -> {
-                    Double left = Double.valueOf(t1.toString());
-                    Double right = Double.valueOf(t1.toString());
-                    return left > right ? left : right;
-                });
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-    }
 
-    private static void checkTypeByAggregateOption(Map<String, AggregateOption> aggOperateMap, Field aggField) {
+    private static void checkTypeByAggregateOption(Map<String, AggregateType> aggOperateMap, Field aggField) {
         String name = aggField.getName();
-        AggregateOption aggregateOption = aggOperateMap.get(name);
+        AggregateType aggregateType = aggOperateMap.get(name);
 
-        switch (aggregateOption) {
+        switch (aggregateType) {
             case SUM: {
                 Class<?> type = aggField.getType();
                 if (type != Integer.class) {
@@ -105,68 +66,91 @@ public class RippleX {
     /**
      * 字段的聚合，使用的操作，Map<columnName, Operate>
      */
-    public RippleX aggOperateMap(Map<String, AggregateOption> aggOperateMap) {
-        this.aggOperateMap = aggOperateMap;
+    public RippleX aggregateRelationMap(Map<String, AggregateType> aggregateRelationMap) {
+        this.aggregateRelationMap = aggregateRelationMap;
         return this;
     }
 
-    public RippleX groupColumns(List<String> groupColumnList) {
-        this.groupColumnList = groupColumnList;
+    public RippleX groupColumnNames(String... groupColumnNames) {
+        this.groupColumnNames = Arrays.asList(groupColumnNames);
         return this;
     }
 
-    public RippleX exclude(List<String> excludeColumnList) {
-        this.excludeColumnList = excludeColumnList;
+    public RippleX groupColumnNames(List<String> groupColumnNames) {
+        this.groupColumnNames = groupColumnNames;
         return this;
     }
 
-    public RippleX schema(Class<?> schema) {
-        this.schema = schema;
+    public RippleX excludeColumnNames(String... excludeColumnNames) {
+        this.excludeColumnList = Arrays.asList(excludeColumnNames);
+        return this;
+    }
+    public RippleX excludeColumnNames(List<String> excludeColumnNames) {
+        this.excludeColumnList = excludeColumnNames;
         return this;
     }
 
-    public List<Map<String, Object>> build() {
+    public RippleX returnType(Class<?> schemaClass) {
+        this.schema = schemaClass;
+        return this;
+    }
+
+    /**
+     * build
+     * @return 构建出分组计算后的 List<Map>
+     */
+    public <T> List<T> build() {
 
         checkSchema();
-        // TODO get all schema's fields
+        List<Map<String, Object>> aggregateDataMapList = getAggregateDataMapList();
+
+        // TODO - ORM
+        return (List<T>) Map2InstanceOrm.orm(aggregateDataMapList, schema);
+
+    }
+
+    private List<Map<String, Object>> getAggregateDataMapList() {
+        // schema 必须拥有和 dataList 一样的 fieldName, 否则统计统计失败
         List<Field> allColumns = ReflectUtil.getFieldsRecursive(schema);
 
+        if (CollectionUtils.isEmpty(allColumns)) {
+            return new ArrayList<>();
+        }
+
         // 1 all field
-        allColNameList = allColumns.stream().map(Field::getName).collect(Collectors.toList());
-        count = allColNameList.size();
+        aClassAllColumnName = allColumns.stream().map(Field::getName).collect(Collectors.toList());
+        fieldNameSize = aClassAllColumnName.size();
 
         // 2 aggregate fields
-        aggColumnNameList = new ArrayList<>(allColNameList);
-        aggColumnNameList.removeAll(groupColumnList);
+        aggColumnNameList = new ArrayList<>(aClassAllColumnName);
+        aggColumnNameList.removeAll(groupColumnNames);
         aggColumnNameList.removeAll(excludeColumnList);
 
         // 3
-        keepColList = new ArrayList<>(allColNameList);
-        keepColList.removeAll(aggColumnNameList);
-        keepColList.removeAll(excludeColumnList);
+        keepColumnNames = new ArrayList<>(aClassAllColumnName);
+        keepColumnNames.removeAll(aggColumnNameList);
+        keepColumnNames.removeAll(excludeColumnList);
 
         // 2、Aggregate
         // aggregate Field 必须是 Number 类型
 
         for (Object data : dataList) {
-            Map<String, Object> aggMap = getGroupByMap(data);
+            Map<String, Object> dataMap = getGroupByMap(data);
 
             // 对 Group By Map 进行 agg / create once 操作
-            for (String aggCol : aggColumnNameList) {
-                Object value = ReflectUtil.getValueByField(data, aggCol);
-
-
-                String aggValue = String.valueOf(Optional.ofNullable(value).orElse("1"));
+            for (String aggColName : aggColumnNameList) {
+                Object value = ReflectUtil.getValueByField(data, aggColName);
 
                 // Aggregate 应该动态选择使用
-                handleAggregateByType(aggOperateMap, aggMap, aggCol, aggValue);
+                AggregateStrategy.aggregate(dataMap, aggregateRelationMap, aggColName, value);
             }
-            // Keep col
-            for (String keepCol : keepColList) {
-                if (aggMap.get(keepCol) != null) {
+
+            // Keep not change column
+            for (String keepColName : keepColumnNames) {
+                if (dataMap.get(keepColName) != null) {
                     continue;
                 }
-                Object value = ReflectUtil.getValueByField(data, keepCol);
+                Object value = ReflectUtil.getValueByField(data, keepColName);
                 if (value == null) {
                     continue;
                 }
@@ -177,17 +161,16 @@ public class RippleX {
                 if (keepColValue == null) {
                     continue;
                 }
-                aggMap.put(keepCol, keepColValue);
+                dataMap.put(keepColName, keepColValue);
             }
 
             if (isMapCacheExist) {
                 isMapCacheExist = resetCache();
             } else {
-                aggMapList.add(aggMap);
+                resultMapList.add(dataMap);
             }
         }
-
-        return aggMapList;
+        return resultMapList;
     }
 
     private void checkSchema() {
@@ -208,7 +191,7 @@ public class RippleX {
      * @return group By Map
      */
     private Map<String, Object> getGroupByMap(Object data) {
-        Map<String, Object> aggMap = getExistsGroupByMap(data, groupColumnList);
+        Map<String, Object> aggMap = getExistsGroupByMap(data, groupColumnNames);
         if (aggMap != null) {
             isMapCacheExist = true;
             return aggMap;
@@ -216,7 +199,7 @@ public class RippleX {
 
         aggMap = new HashMap<>();
         // 不存在， 构建一个 Group By Map
-        for (String groupColumn : groupColumnList) {
+        for (String groupColumn : groupColumnNames) {
             Object value = ReflectUtil.getValueByField(data, groupColumn);
             if (value == null) {
                 continue;

@@ -1,18 +1,13 @@
-package com.neko.ripple.demo;
+package demo;
 
-import com.neko.ripple.RippleX;
-import com.neko.ripple.constant.AggregateOption;
-import com.neko.ripple.pojo.Cat;
-import com.neko.ripple.pojo.User;
+import pojo.Cat;
+import pojo.User;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
-@SpringBootApplication
 public class Demo2 {
 
     public static void main(String[] args) {

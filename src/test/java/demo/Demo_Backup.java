@@ -1,9 +1,9 @@
-package com.neko.ripple.demo;
+package demo;
 
-import com.neko.ripple.RippleX;
-import com.neko.ripple.constant.AggregateOption;
-import com.neko.ripple.pojo.Cat;
-import com.neko.ripple.pojo.User;
+import com.neko233.ripple.RippleX;
+import com.neko233.ripple.constant.AggregateType;
+import pojo.Cat;
+import pojo.User;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import java.util.ArrayList;
@@ -11,7 +11,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@SpringBootApplication
 public class Demo_Backup {
 
     public static void main(String[] args) {
@@ -26,11 +25,11 @@ public class Demo_Backup {
 //            add("id");
         }};
 
-        Map<String, AggregateOption> handleMap = new HashMap<String, AggregateOption>() {{
+        Map<String, AggregateType> handleMap = new HashMap<String, AggregateType>() {{
 //            put("id", AggregateOption.MAX);
 //            put("age", AggregateOption.SUM);
 //            put("salary", AggregateOption.MIN);
-            put("name", AggregateOption.COUNT);
+            put("name", AggregateType.COUNT);
         }};
 
         List<User> users = new ArrayList<User>() {{
@@ -46,10 +45,10 @@ public class Demo_Backup {
 
         List<Map<String, Object>> ripple = RippleX.builder()
             .data(users)
-            .schema(User.class)
-            .aggOperateMap(handleMap)
-            .groupColumns(groupColumnList)
-            .exclude(excludeColumnList)
+            .returnType(User.class)
+            .aggregateRelationMap(handleMap)
+            .groupColumnNames(groupColumnList)
+            .excludeColumnNames(excludeColumnList)
             .build();
 
 

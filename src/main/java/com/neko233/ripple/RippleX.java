@@ -36,13 +36,12 @@ public class RippleX {
     private List<String> excludeColumnList;
     private List<String> aClassAllColumnName;
     private ArrayList<String> aggColumnNameList;
-    private ArrayList<String> keepColumnNames;
+//    private ArrayList<String> keepColumnNames;
 
     /**
      * 2. Calculate Needed Data
      */
     private int fieldNameSize = 0;
-    private boolean IS_EXISTED_CACHE_FLAG = false;
     private String CURRENT_GROUP_BY_KEY = null;
     /**
      * groupByKey : toNextAggregateDataMap< FieldName, value >
@@ -106,9 +105,13 @@ public class RippleX {
      * @return 构建出分组计算后的 List<Map>
      */
     public <T> List<T> build() {
-
         checkSchema();
-        // get Map
+        // 1. set config options
+        boolean isConfigSuccess = rememberAndSetConfigOptions();
+        if (!isConfigSuccess) {
+            return new ArrayList<>();
+        }
+
         List<Map<String, Object>> aggregateDataMapList = getAggregateDataMapList();
         // orm
         return (List<T>) Map2InstanceOrm.orm(aggregateDataMapList, schema);
@@ -116,17 +119,9 @@ public class RippleX {
     }
 
     private List<Map<String, Object>> getAggregateDataMapList() {
-        // 1. set config options
-        boolean isConfigSuccess = rememberAndSetConfigOptions();
-        if (!isConfigSuccess) {
-            return new ArrayList<>();
-        }
-
-
         List<Map<String, Object>> dataMapList = dataList.stream()
                 .map(obj -> Transformer.transformObject2Map(obj, groupColumnNames, aggColumnNameList))
                 .collect(Collectors.toList());
-
 
         Map<String, List<Map<String, Object>>> groupByDimensionValueMap = dataMapList.stream()
                 .collect(Collectors.groupingBy(map -> {
@@ -139,68 +134,40 @@ public class RippleX {
                 }));
 
         // TODO 指标滚动计算
-        List<Map<String, Object>> outputMeasureMapList = groupByDimensionValueMap.entrySet().stream()
-                .map(entry -> {
-                    List<Map<String, Object>> v = entry.getValue();
+        return groupByDimensionValueMap.values().stream()
+                .map(v -> {
                     Map<String, Object> aggMap = new HashMap<>();
                     // 必定是同一组
                     for (Map<String, Object> dataMap : v) {
                         // 指标名
                         for (String aggColumnName : aggColumnNameList) {
-                            AggregateType aggregateType = measureConfig.get(aggColumnName);
+                            AggregateType aggregateType = measureConfig.getAggregateType(aggColumnName);
                             if (aggregateType == null) {
                                 continue;
                             }
-                            MergeStrategy strategy = MergeStrategy.choose(aggregateType);
                             // 滚动计算的值
                             Object aggValue = dataMap.get(aggColumnName);
                             if (aggValue == null) {
                                 continue;
                             }
-                            BiFunction<? super Object, ? super Object, ?> mergeBiFunction = strategy.getMergeBiFunction(aggValue.getClass());
-                            aggMap.merge(aggColumnName, aggValue, mergeBiFunction);
+                            MergeStrategy strategy = MergeStrategy.choose(aggregateType);
+                            BiFunction<? super Object, ? super Object, ?> mergeBiFunction = strategy
+                                    .getMergeBiFunction(aggValue.getClass());
+
+                            // input -> Merge Algorithm -> output
+                            String outputColumnName = measureConfig.getOutputColumnName(aggColumnName);
+                            if (aggregateType == AggregateType.COUNT) {
+                                aggMap.merge(outputColumnName, 1, mergeBiFunction);
+                            } else if (aggregateType == AggregateType.KEEP_FIRST) {
+                                aggMap.merge(aggColumnName, aggValue, (v1, v2) -> v1);
+                            } else {
+                                aggMap.merge(outputColumnName, aggValue, mergeBiFunction);
+                            }
                         }
                     }
                     return aggMap;
                 })
                 .collect(Collectors.toList());
-
-
-        // FIXME 2. aggregate calculate
-//        for (Object data : dataList) {
-//            // 获取 new Map / cached Map, 基于
-//            Map<String, Object> aggMap = getGroupByMapOrCache(data);
-//
-//            for (String aggColName : aggColumnNameList) {
-//                Object value = ReflectUtil.getValueByField(data, aggColName);
-//                // 计算聚合
-//                Aggregator.aggregateByStep(aggMap, measureConfig, aggColName, value);
-//            }
-//
-//            // Keep not change column
-//            setNotChangeColumnValue2AggMap(data, aggMap);
-//
-//            // 判断是否存在过
-//            if (IS_EXISTED_CACHE_FLAG) {
-//                IS_EXISTED_CACHE_FLAG = false;
-//            } else {
-//                resultMapList.add(aggMap);
-//            }
-//        }
-        return outputMeasureMapList;
-    }
-
-    private void setNotChangeColumnValue2AggMap(Object data, Map<String, Object> dataMap) {
-        for (String keepColName : keepColumnNames) {
-            if (dataMap.get(keepColName) != null) {
-                continue;
-            }
-            Object value = ReflectUtil.getValueByField(data, keepColName);
-            if (value == null) {
-                continue;
-            }
-            dataMap.put(keepColName, value);
-        }
     }
 
     private boolean rememberAndSetConfigOptions() {
@@ -215,13 +182,17 @@ public class RippleX {
 
         // 2 aggregate fields
         aggColumnNameList = new ArrayList<>(aClassAllColumnName);
-        aggColumnNameList.removeAll(groupColumnNames);
+        // TODO 是否保留 group By 信息
+//        aggColumnNameList.removeAll(groupColumnNames);
         aggColumnNameList.removeAll(Optional.ofNullable(excludeColumnList).orElse(new ArrayList<>()));
 
         // 3
-        keepColumnNames = new ArrayList<>(aClassAllColumnName);
-        keepColumnNames.removeAll(aggColumnNameList);
-        keepColumnNames.removeAll(Optional.ofNullable(excludeColumnList).orElse(new ArrayList<>()));
+//        List<String> keepColumnNames = new ArrayList<>(aClassAllColumnName);
+//        keepColumnNames.removeAll(aggColumnNameList);
+//        keepColumnNames.removeAll(Optional.ofNullable(excludeColumnList).orElse(new ArrayList<>()));
+//        for (String keepColumnName : keepColumnNames) {
+//            measureConfig.set(keepColumnName, AggregateType.KEEP_FIRST, keepColumnName);
+//        }
         return true;
     }
 
@@ -229,34 +200,6 @@ public class RippleX {
         if ("Object".equals(schema.getSimpleName())) {
             throw new RuntimeException("Object can't be a schema because it have no fields.");
         }
-    }
-
-    /**
-     * group By [N column] : 1 Map
-     * "column_value_1,column_value_2" : aggregate Map
-     *
-     * @param obj 处理的数据
-     * @return group By Map
-     */
-    private Map<String, Object> getGroupByMapOrCache(Object obj) {
-        Map<String, Object> cacheMap = getMapFromCacheByObjectValues(obj);
-        if (MapUtils.isNotEmpty(cacheMap)) {
-            IS_EXISTED_CACHE_FLAG = true;
-            return cacheMap;
-        }
-
-        // 不存在， 构建一个 Aggregate Map
-        Map<String, Object> dataMap = new HashMap<>();
-        for (String groupColumn : groupColumnNames) {
-            Object value = ReflectUtil.getValueByField(obj, groupColumn);
-            if (value == null) {
-                continue;
-            }
-            dataMap.put(groupColumn, value);
-        }
-        // 放入缓存
-        aggMapCache.put(CURRENT_GROUP_BY_KEY, dataMap);
-        return dataMap;
     }
 
     /**

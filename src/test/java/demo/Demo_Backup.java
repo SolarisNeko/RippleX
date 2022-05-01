@@ -5,6 +5,7 @@ import com.neko233.ripple.config.MeasureConfig;
 import com.neko233.ripple.constant.AggregateType;
 import org.junit.jupiter.api.Test;
 import pojo.Cat;
+import pojo.CatStatistics;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,14 +41,14 @@ public class Demo_Backup {
         /**
          * dimension > measure
          */
-        List<Cat> ripple = RippleX.builder()
+        List<CatStatistics> ripple = RippleX.builder()
                 .data(cats)
                 .dimensionColumnNames("type")
-//                .excludeColumnNames("id")
+                .excludeColumnNames("id")
                 .measureConfig(MeasureConfig.builder()
-                        .set("name", AggregateType.COUNT)
+                        .set("type", AggregateType.COUNT, "count")
                 )
-                .returnType(Cat.class)
+                .returnType(CatStatistics.class)
                 .build();
 
 

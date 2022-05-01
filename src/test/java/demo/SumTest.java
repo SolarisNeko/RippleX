@@ -8,12 +8,10 @@ import org.junit.jupiter.api.Test;
 import pojo.User;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
-public class Demo {
+public class SumTest {
 
     // group by 字段做 distinct 处理, 其余做 aggregate 操作
     @Test
@@ -39,8 +37,9 @@ public class Demo {
                 .dimensionColumnNames("job")
                 .excludeColumnNames("id")
                 .measureConfig(MeasureConfig.builder()
-                        .set("age", AggregateType.SUM)
-                        .set("salary", AggregateType.SUM))
+                        .set("age", AggregateType.SUM, "age")
+                        .set("salary", AggregateType.SUM, "salary")
+                )
                 .returnType(User.class)
                 .build();
         List<User> ripple = build.stream()

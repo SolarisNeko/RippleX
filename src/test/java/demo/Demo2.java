@@ -20,9 +20,21 @@ public class Demo2 {
             add(User.builder().id(3).name("duck").job("worker").age(40).salary(1000d).build());
         }};
         List<Cat> cats = new ArrayList<Cat>() {{
-            add(new Cat(1, "Zzz", "布偶", 10000));
-            add(new Cat(1, "小花", "布偶", 10000));
-            add(new Cat(3, "哈撒给", "英美", 10000));
+            add(Cat.builder()
+                    .name("Zzz")
+                    .type("布偶")
+                    .price(1000)
+                    .build());
+            add(Cat.builder()
+                    .name("小花")
+                    .type("布偶")
+                    .price(1000)
+                    .build());
+            add(Cat.builder()
+                    .name("哈撒给")
+                    .type("布偶")
+                    .price(1000)
+                    .build());
         }};
 
 

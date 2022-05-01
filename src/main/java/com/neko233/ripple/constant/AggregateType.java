@@ -6,6 +6,8 @@ package com.neko233.ripple.constant;
  */
 public enum AggregateType {
 
+    KEEP_FIRST,
+
     SUM,
 
     COUNT,

@@ -17,6 +17,9 @@ public interface MergeStrategy {
 
     static MergeStrategy choose(AggregateType aggType) {
         switch (aggType) {
+            case KEEP_FIRST: {
+                return KeepFirstMergeStrategy.getInstance();
+            }
             case SUM: {
                 return SumMergeStrategy.getInstance();
             }

@@ -25,7 +25,12 @@ public class User implements Comparable{
     public int compareTo(Object o) {
         if (o instanceof User) {
             User otherUser = (User) o;
-            return this.getSalary().compareTo(otherUser.getSalary());
+            Double salary1 = this.getSalary();
+            Double salary2 = otherUser.getSalary();
+            if (salary1 == null || salary2 == null) {
+                return 0;
+            }
+            return salary1.compareTo(salary2);
         }
         return 0;
     }

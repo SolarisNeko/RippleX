@@ -6,9 +6,9 @@ import java.util.function.BiFunction;
  * @author SolarisNeko
  * Date on 2022-04-30
  */
-public class CountMergeStrategy implements MergeStrategy {
+public class KeepFirstMergeStrategy implements MergeStrategy {
 
-    private static final MergeStrategy INSTANCE = new CountMergeStrategy();
+    private static final MergeStrategy INSTANCE = new KeepFirstMergeStrategy();
 
     public static MergeStrategy getInstance() {
         return INSTANCE;
@@ -16,6 +16,6 @@ public class CountMergeStrategy implements MergeStrategy {
 
     @Override
     public BiFunction<? super Object, ? super Object, ?> getMergeBiFunction(Class sumType) {
-        return (t1, t2) -> Integer.parseInt(String.valueOf(t1)) + 1;
+        return (t1, t2) -> t1;
     }
 }

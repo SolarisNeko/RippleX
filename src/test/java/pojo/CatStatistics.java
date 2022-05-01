@@ -15,9 +15,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Cat {
+public class CatStatistics {
 
-    Integer id;
 
     String name;
 
@@ -25,7 +24,7 @@ public class Cat {
 
     Integer price;
 
-    Integer appearCount;
+    Integer count;
 
 
 }

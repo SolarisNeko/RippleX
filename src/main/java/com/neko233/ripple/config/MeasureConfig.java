@@ -12,13 +12,25 @@ import java.util.Map;
 public class MeasureConfig {
 
     private final Map<String, AggregateType> aggregateTypeMap = new HashMap<>();
+    private final Map<String, String> aliasColumnNameMap = new HashMap<>();
 
     public static MeasureConfig builder() {
         return new MeasureConfig();
     }
 
-    public MeasureConfig set(String columnName, AggregateType aggregateType) {
-        aggregateTypeMap.put(columnName, aggregateType);
+    /**
+     * input -> output as same Name
+     * @param inputOutputColumnName 输入输出的列名
+     * @param aggregateType 聚合类型
+     * @return 配置
+     */
+    public MeasureConfig set(String inputOutputColumnName, AggregateType aggregateType) {
+        return set(inputOutputColumnName, aggregateType, inputOutputColumnName);
+    }
+
+    public MeasureConfig set(String inputColumnName, AggregateType aggregateType, String outputColumnName) {
+        aggregateTypeMap.put(inputColumnName, aggregateType);
+        aliasColumnNameMap.put(inputColumnName, outputColumnName);
         return this;
     }
 
@@ -31,8 +43,12 @@ public class MeasureConfig {
      * @param columnName 列名
      * @return 聚合类型
      */
-    public AggregateType get(String columnName) {
+    public AggregateType getAggregateType(String columnName) {
         return aggregateTypeMap.get(columnName);
+    }
+
+    public String getOutputColumnName(String inputColumnName) {
+        return aliasColumnNameMap.get(inputColumnName);
     }
 
 }

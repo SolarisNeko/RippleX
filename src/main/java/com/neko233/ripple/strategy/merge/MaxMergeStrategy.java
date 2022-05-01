@@ -19,7 +19,7 @@ public class MaxMergeStrategy implements MergeStrategy {
     }
 
     @Override
-    public BiFunction<? super Object, ? super Object, ?> merge(Class sumType) {
+    public BiFunction<? super Object, ? super Object, ?> getMergeBiFunction(Class sumType) {
         switch (sumType.getName()) {
             case "short":
             case "Short":

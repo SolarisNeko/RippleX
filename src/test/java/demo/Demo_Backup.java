@@ -1,16 +1,13 @@
 package demo;
 
 import com.neko233.ripple.RippleX;
+import com.neko233.ripple.config.MeasureConfig;
 import com.neko233.ripple.constant.AggregateType;
 import org.junit.jupiter.api.Test;
 import pojo.Cat;
-import pojo.User;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class Demo_Backup {
 
@@ -40,13 +37,16 @@ public class Demo_Backup {
                     .build());
         }};
 
+        /**
+         * dimension > measure
+         */
         List<Cat> ripple = RippleX.builder()
                 .data(cats)
-                .groupColumnNames("type")
-                .excludeColumnNames("id")
-                .aggregateRelationMap(new HashMap<String, AggregateType>() {{
-                    put("name", AggregateType.COUNT);
-                }})
+                .dimensionColumnNames("type")
+//                .excludeColumnNames("id")
+                .measureConfig(MeasureConfig.builder()
+                        .set("name", AggregateType.COUNT)
+                )
                 .returnType(Cat.class)
                 .build();
 

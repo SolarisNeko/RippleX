@@ -29,7 +29,7 @@ public class Aggregator {
 
         // 2. get Merge Strategy
         MergeStrategy mergeStrategy = MergeStrategy.choose(aggType);
-        BiFunction<? super Object, ? super Object, ?> merge = mergeStrategy.merge(aggValue.getClass());
+        BiFunction<? super Object, ? super Object, ?> merge = mergeStrategy.getMergeBiFunction(aggValue.getClass());
         // 3. COUNT is a special type
         if (aggType == AggregateType.COUNT) {
             aggregateMap.merge(aggColName, 1, merge);

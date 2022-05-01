@@ -12,7 +12,7 @@ import java.util.function.BiFunction;
 public interface MergeStrategy {
 
 
-    BiFunction<? super Object, ? super Object, ?> merge(Class sumType);
+    BiFunction<? super Object, ? super Object, ?> getMergeBiFunction(Class sumType);
 
 
     static MergeStrategy choose(AggregateType aggType) {

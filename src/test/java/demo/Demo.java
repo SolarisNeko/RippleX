@@ -1,16 +1,17 @@
 package demo;
 
 import com.neko233.ripple.RippleX;
+import com.neko233.ripple.config.MeasureConfig;
 import com.neko233.ripple.constant.AggregateType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.springframework.util.Assert;
 import pojo.User;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class Demo {
 
@@ -30,23 +31,21 @@ public class Demo {
             add(User.builder().id(4).name("boss").job("boss").age(66).salary(666666d).build());
         }};
 
-        /**
-         * 聚合配置
-         */
-        Map<String, AggregateType> aggregateRelationMap = new HashMap<String, AggregateType>() {{
-            put("age", AggregateType.SUM);
-            put("salary", AggregateType.SUM);
-        }};
 
         // Ripple 水波
         // TODO ORM test
-        List<User> ripple = RippleX.builder()
+        List<User> build = RippleX.builder()
                 .data(dataList)
-                .groupColumnNames("job")
+                .dimensionColumnNames("job")
                 .excludeColumnNames("id")
-                .aggregateRelationMap(aggregateRelationMap)
+                .measureConfig(MeasureConfig.builder()
+                        .set("age", AggregateType.SUM)
+                        .set("salary", AggregateType.SUM))
                 .returnType(User.class)
                 .build();
+        List<User> ripple = build.stream()
+                .sorted(User::compareTo)
+                .collect(Collectors.toList());
 
         Double salary0 = ripple.get(0).getSalary();
         Assertions.assertEquals(4000d, salary0);

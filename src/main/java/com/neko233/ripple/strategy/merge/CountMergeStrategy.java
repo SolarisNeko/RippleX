@@ -15,7 +15,7 @@ public class CountMergeStrategy implements MergeStrategy {
     }
 
     @Override
-    public BiFunction<? super Object, ? super Object, ?> merge(Class sumType) {
+    public BiFunction<? super Object, ? super Object, ?> getMergeBiFunction(Class sumType) {
         return (t1, t2) -> (Integer) t1 + 1;
     }
 }
